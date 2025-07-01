@@ -33,8 +33,25 @@ import db from '../models/index.js';
  */
 export const createCourse = async (req, res) => {
     try {
-        const course = await db.Course.create(req.body);
-        res.status(201).json(course);
+        const limit = parseInt(reportError.query.limit) || 10;
+        const page = parseInt(reportError.query.page) || 1;
+        const offset = (page - 1) * limit;      
+        const sort = req.query.sort === 'desc' ? 'DESC' : 'ASC';
+        let include = [];
+        if(req.query.populate === 'teacher')include.push(db.Teacher);
+        if(req.query.populate === 'students')include.push(db.Student);
+        const course = await db.Course.findAndCountAll({
+            limit,
+            offset,
+            order: [['createdAt', sort]],
+            include,
+        });
+        res.json({
+            total: courses.count,
+            page,
+            pages: Math.ceil(courses.count / limit),
+            data: courses.rows,
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -48,13 +65,27 @@ export const createCourse = async (req, res) => {
  *     tags: [Courses]
  *     parameters:
  *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of records per page
+ *       - in: query
  *         name: page
- *         schema: { type: integer, default: 1 }
+ *         schema:
+ *           type: integer
  *         description: Page number
  *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Number of items per page
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *         description: Sort order (asc or desc) by created time
+ *       - in: query
+ *         name: populate
+ *         schema:
+ *           type: string
+ *           enum: [teacher, students]
+ *         description: Populate related models (e.g., teacher, students)
  *     responses:
  *       200:
  *         description: List of courses

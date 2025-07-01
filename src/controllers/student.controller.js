@@ -22,14 +22,53 @@ export const createStudent = async (req, res) => {
  *   get:
  *     summary: Get all students
  *     tags: [Students]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Number of records per page
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [asc, desc]
+ *         description: Sort order (asc or desc) by created time
+ *       - in: query
+ *         name: populate
+ *         schema:
+ *           type: string
+ *           enum: [courses]
+ *         description: Populate related models (e.g., courses)
  *     responses:
  *       200:
  *         description: List of students
  */
 export const getAllStudents = async (req, res) => {
     try {
-        const students = await db.Student.findAll({ include: db.Course });
-        res.json(students);
+        const limit = parseInt(req.query.limit) || 10;
+        const page = parseInt(req.query.page) || 1;
+        const offset = (page - 1) * limit;
+        const sort = req.query.sort === 'desc' ? 'DESC' : 'ASC';
+        let include = [];
+        if(req.query.populate === 'courses') include.push(db.Course);
+        const students = await db.Student.findAndCountAll({ 
+            limit,
+            offset,
+            order:[['createdAt', sort]],
+            include,
+         });
+        res.json({
+            total: students.count,
+            page,
+            pages: Math.ceil(students.count / limit),
+            data: students.rows,
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
